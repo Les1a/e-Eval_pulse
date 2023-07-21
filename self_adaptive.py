@@ -12,6 +12,21 @@ def bandpass(ori, low, high, fs):
     return out
 
 
+def find_max_frequency(input_array, sample_rate):
+    # 使用FFT变换找到频率最大处
+    fft_result = np.fft.fft(input_array)
+    fft_magnitude = np.abs(fft_result)
+    max_frequency_index = np.argmax(fft_magnitude)
+    frequencies = np.fft.fftfreq(len(input_array), 1/sample_rate)
+    max_frequency_fft = frequencies[max_frequency_index]
+
+    # 使用频率功率方法找到频率最大处
+    frequencies, power_spectrum = signal.welch(input_array, fs=sample_rate)
+    max_frequency_power = frequencies[np.argmax(power_spectrum)]
+
+    return max_frequency_fft, max_frequency_power
+
+
 def find_best_n(sign, bg):
     n_values = np.arange(0, 10, 0.01)  # 可以根据需要调整n的范围和步长
     mse_values = []
@@ -27,7 +42,7 @@ def find_best_n(sign, bg):
     return best_n, min_mse
 
 
-def load_data(data_path='./data/150-130.csv'):
+def load_data(data_path='./data/150.csv'):
     event_points = pd.read_csv(data_path, names=['t', 'x', 'y', 'p'])  # names=['x', 'y', 'p', 't']
 
     period_t = 1 / fps * 1e6  # us
@@ -37,7 +52,7 @@ def load_data(data_path='./data/150-130.csv'):
     '''sum events'''
     img_list = []
     # for n in np.arange(num_frame):
-    for n in range(5600, 6080):
+    for n in range(120, 600):
         print(n)
         chosen_idx = np.where((event_points['t'] >= period_t * n) * (event_points['t'] < period_t * (n + 1)))[0]
         xypt = event_points.iloc[chosen_idx]
@@ -51,12 +66,11 @@ def load_data(data_path='./data/150-130.csv'):
 
     '''add mask'''
     face_mask = np.zeros((H, W))
-    face_mask[210:275, 175:255] = 1  # face
-    face_mask[220:290, 380:455] = 1  # face
+    face_mask[77:166, 131:225] = 1  # face
+    face_mask[80:175, 360:468] = 1  # face
 
     bg_mask = np.zeros((H, W))
-    bg_mask[:, :80] = 1  # background
-    bg_mask[:, 580:] = 1  # background
+    bg_mask[245:385, 490:] = 1  # background
 
     bg_s = np.sum(bg_mask)
     face_s = np.sum(face_mask)
@@ -90,6 +104,8 @@ if __name__ == '__main__':
     for i in range(len(sa_signal_bp)):
         sa_signal_bp[i] = face_avg_bp[i] - n_bp * bg_avg_bp[i]
 
+    fft_max, power_max = find_max_frequency(sa_signal_bp, fps)
+
     plt.subplot(3, 2, 1)
     plt.plot(face_avg)
     plt.title('face')
@@ -113,14 +129,15 @@ if __name__ == '__main__':
     X_mag = np.abs(X)  # 频谱幅度
     freq = np.fft.fftfreq(len(x)) * fps * 60  # 频率(min^-1)
     plt.plot(freq[:len(x) // 2], X_mag[:len(x) // 2], 'b-')
-    plt.title('bp_sa_signal')
+    plt.title('bp_sa_signal == sa_signal_bp')
 
+    # bp_sa_signal == sa_signal_bp
     plt.subplot(3, 2, 6)
     x = sa_signal_bp
     X = np.fft.fft(x)  # 傅里叶变换
     X_mag = np.abs(X)  # 频谱幅度
     freq = np.fft.fftfreq(len(x)) * fps * 60  # 频率(min^-1)
     plt.plot(freq[:len(x) // 2], X_mag[:len(x) // 2], 'b-')
-    plt.title('sa_signal_bp')
+    plt.title(f'fft_max, power_max = {fft_max*60, power_max*60} bmp')
 
     plt.show()
