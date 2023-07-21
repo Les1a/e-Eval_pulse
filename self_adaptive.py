@@ -42,7 +42,7 @@ def find_best_n(sign, bg):
     return best_n, min_mse
 
 
-def load_data(data_path='./data/150.csv'):
+def load_data(data_path='./data/170-150.csv'):
     event_points = pd.read_csv(data_path, names=['t', 'x', 'y', 'p'])  # names=['x', 'y', 'p', 't']
 
     period_t = 1 / fps * 1e6  # us
@@ -52,7 +52,7 @@ def load_data(data_path='./data/150.csv'):
     '''sum events'''
     img_list = []
     # for n in np.arange(num_frame):
-    for n in range(120, 600):
+    for n in range(4200, 4680):
         print(n)
         chosen_idx = np.where((event_points['t'] >= period_t * n) * (event_points['t'] < period_t * (n + 1)))[0]
         xypt = event_points.iloc[chosen_idx]
@@ -66,11 +66,21 @@ def load_data(data_path='./data/150.csv'):
 
     '''add mask'''
     face_mask = np.zeros((H, W))
-    face_mask[77:166, 131:225] = 1  # face
-    face_mask[80:175, 360:468] = 1  # face
+    face_mask[210:275, 175:255] = 1  # face
+    face_mask[220:290, 380:455] = 1  # face
 
     bg_mask = np.zeros((H, W))
-    bg_mask[245:385, 490:] = 1  # background
+    bg_mask[:, :80] = 1  # background
+    bg_mask[:, 580:] = 1  # background
+
+    plt.figure(figsize=(15, 5))
+    plt.subplot(1, 2, 1)
+    plt.imshow(img_list[200] + face_mask, vmax=0.5, vmin=0)
+
+    plt.subplot(1, 2, 2)
+    plt.imshow(img_list[200] + bg_mask, vmax=0.5, vmin=0)
+
+    plt.show()
 
     bg_s = np.sum(bg_mask)
     face_s = np.sum(face_mask)
@@ -84,6 +94,8 @@ def load_data(data_path='./data/150.csv'):
 fps = 120
 H = 480
 W = 640
+lowp = 0.95
+highp = 4
 
 if __name__ == '__main__':
     face_avg, bg_avg = load_data()
@@ -94,10 +106,10 @@ if __name__ == '__main__':
     for i in range(len(sa_signal)):
         sa_signal[i] = face_avg[i] - n * bg_avg[i]
 
-    bp_sa_signal = bandpass(sa_signal, 1, 4, fps)
+    bp_sa_signal = bandpass(sa_signal, lowp, highp, fps)
 
-    face_avg_bp = bandpass(face_avg, 1, 4, fps)
-    bg_avg_bp = bandpass(bg_avg, 1, 4, fps)
+    face_avg_bp = bandpass(face_avg, lowp, highp, fps)
+    bg_avg_bp = bandpass(bg_avg, lowp, highp, fps)
 
     n_bp, _ = find_best_n(face_avg_bp, bg_avg_bp)
     sa_signal_bp = np.zeros(len(face_avg))
